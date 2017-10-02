@@ -14,6 +14,16 @@ kill = False
 
 
 def without_lock(q):
+    """
+    Here we try to simulate optimistic locking:
+    1. User has a version no.
+    2. He updates the content of the post.
+    3. Another user also has the same version no.
+    4. He also updates the content of the post.
+
+    Race condition happens when a lock is not being used, as the value may change
+    within the read and update query are executed.
+    """
     with psycopg2.connect(dsn) as conn:
         kill = q.get()
         while not kill:
