@@ -23,6 +23,9 @@ def without_lock(q):
 
     Race condition happens when a lock is not being used, as the value may change
     within the read and update query are executed.
+
+    This example doesn't make the state inconsistent. This is just to show how things
+    change between read and update queries.
     """
     with psycopg2.connect(dsn) as conn:
         kill = q.get()
