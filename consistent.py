@@ -13,16 +13,60 @@ dsn = "dbname=consistent user=postgres"
 kill = False
 
 
-def without_lock(q):
+def with_serializable(q):
+    """
+    Using transaction isolation level SERIALIZABLE.
+
+    Reference: https://www.postgresql.org/docs/9.6/static/transaction-iso.html
+
+    Here, a concurrent update exception will be raised, whenever pg detects a conflict.
+    We can catch this exception and retry again or we can just abort.
+    """
+    with psycopg2.connect(dsn) as conn:
+        kill = q.get()
+        conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE)
+
+        while not kill:
+            with conn.cursor() as cur:
+                random_text = str(random.random())
+
+                cur.execute("SELECT version FROM post LIMIT 1;")
+                version = cur.fetchone()[0]
+
+                try:
+                    cur.execute("UPDATE post SET content=%s, version=%s where VERSION=%s RETURNING version;",
+                                (random_text, int(version) + 1, version))
+                    conn.commit()
+
+                    value = cur.fetchone()
+
+                    if not value:
+                        print("Failed old_value[{}], new_value[{}]".format(value, random_text))
+                        q.put(True)
+                        break
+
+                except psycopg2.Error as e:
+                    print(e)
+                    q.put(True)
+                    break
+
+                time.sleep(0.2)
+
+                if not q.empty():
+                    kill = q.get()
+
+
+def with_optimistic_lock(q):
     """
     Here we try to simulate optimistic locking:
     1. User has a version no.
     2. He updates the content of the post.
     3. Another user also has the same version no.
     4. He also updates the content of the post.
+    5. Both updates happen at the same time.
 
     Race condition happens when a lock is not being used, as the value may change
-    within the read and update query are executed.
+    within the time read and update query are executed.
 
     This example doesn't make the state inconsistent. This is just to show how things
     change between read and update queries.
@@ -56,7 +100,7 @@ def without_lock(q):
                     kill = q.get()
 
 
-def with_lock(q):
+def with_update_lock(q):
     """
     Using FOR UPDATE lock from postgres.
 
@@ -74,6 +118,7 @@ def with_lock(q):
                 try:
                     cur.execute("UPDATE post SET content=%s, version=%s where VERSION=%s RETURNING version;",
                                 (random_text, int(version) + 1, version))
+                    time.sleep(45)
                     conn.commit()
 
                     value = cur.fetchone()
@@ -103,10 +148,12 @@ def start(test):
         print("Please provide a value for --test option")
         exit(1)
 
-    if test == "with_lock":
-        target = with_lock
-    elif test == "without_lock":
-        target = without_lock
+    if test == "with_update_lock":
+        target = with_update_lock
+    elif test == "with_optimistic_lock":
+        target = with_optimistic_lock
+    elif test == "with_serializable":
+        target = with_serializable
     else:
         print("Bad argument value for test")
         exit(1)
