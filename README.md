@@ -24,3 +24,14 @@ we have a lock on.
 This is a feature of the database, which detects any race conditions and aborts automatically.
 It's up to the client how it handles the abort. The transaction can be retried or just
 abort displaying the message to the user.
+
+
+## Usage
+
+`python consistent.py --test with_update_lock`
+
+Test argument can have the following options
+
+- with_optimistic_lock
+- with_update_lock
+- with_serializable
