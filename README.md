@@ -2,7 +2,7 @@
 This type of locking can be useful when multiple users try to update the same resource.
 
 The way it works is, every row has a version number and when an update is being done,
-it is applied only if it has not changed. If it has changed, it means that it was updated
+it is applied only if version has not changed. If it has changed, it means that it was updated
 by another user. We can show a message to the user saying, "the data has been updated
 by some other user, please refresh the page."
 
